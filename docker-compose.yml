@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+    restart: always
+    ports:
+      - 81:${NGINX_SERVER_PORT}
+    volumes:
+      - ./:/var/www/project_site
+      - ./docker/nginx/nginx.conf.example:/etc/nginx/nginx.conf
+      - ./docker/nginx/sites-available/project.template:/etc/nginx/sites-avaliable/project.template
+    env_file:
+      - .env
+    environment:
+      - NGINX_SERVER_PORT
+      - NGINX_PROJECT_ROOT
+      - APP_PHP_FPM_PORT
+      - APP_PHP_FPM_HOST
+    command: /bin/bash -c "mkdir -p /etc/nginx/sites-enabled/ && envsubst '$${APP_PHP_FPM_PORT} $${APP_PHP_FPM_HOST} $${NGINX_PROJECT_ROOT} $${NGINX_SERVER_PORT}' < /etc/nginx/sites-avaliable/project.template > /etc/nginx/sites-enabled/project.conf && nginx -g 'daemon off;'"
+
+  php_app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    restart: always
+    volumes:
+      - ./:/var/www/project_site
+    depends_on:
+     - db
+
+  db:
+    build:
+      context: .
+      dockerfile: docker/mysql/Dockerfile
+    restart: always
+    ports:
+      - ${MYSQL_TCP_PORT}:${MYSQL_TCP_PORT}
+    volumes:
+      - ./docker/mysql/dumps/:/docker-entrypoint-initdb.d/
+    env_file:
+      - .env
+    environment:
+      - MYSQL_USER
+      - MYSQL_PASSWORD
+      - MYSQL_DATABASE
+      - MYSQL_ROOT_PASSWORD
+      - MYSQL_LOG_CONSOLE
+      - MYSQL_TCP_PORT
